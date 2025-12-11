@@ -1,0 +1,17 @@
+# DownX - Bazzite Style Requirements
+
+# Core
+yt-dlp>=2024.0.0
+spotdl>=4.2.0
+
+# API Clients
+spotipy>=2.23.0
+requests>=2.31.0
+
+# Audio Processing
+mutagen>=1.47.0
+Pillow>=10.0.0
+
+# Optional
+selenium>=4.15.0  # For cookie extraction (optional)
+webdriver-manager>=4.0.0  # For Selenium (optional)
