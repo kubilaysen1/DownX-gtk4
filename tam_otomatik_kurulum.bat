@@ -3,6 +3,9 @@ setlocal EnableDelayedExpansion
 color 0B
 title DownX - Tam Otomatik Kurulum ve Build Araci
 
+:: Proje klasorune gecisi garanti et
+cd /d "%~dp0"
+
 echo ========================================================
 echo   DownX - BAZZITE STYLE - WINDOWS BUILD OTOMASYONU
 echo ========================================================
@@ -18,14 +21,29 @@ if %errorlevel% neq 0 (
 )
 echo    Python mevcut.
 
-:: 2. SANAL ORTAM (VENV)
+:: 2. SANAL ORTAM (VENV) TEMIZ KURULUM
 echo.
 echo [2/6] Sanal ortam (venv) hazirlaniyor...
-if not exist "venv" (
-    python -m venv venv
-    echo    Venv olusturuldu.
+:: Eski venv varsa sil (Hatalari onlemek icin)
+if exist "venv" (
+    echo    Eski bozuk ortam temizleniyor...
+    rmdir /s /q "venv"
 )
+
+python -m venv venv
+if %errorlevel% neq 0 (
+    echo [HATA] Venv olusturulamadi. Python kurulumunuzu kontrol edin.
+    pause
+    exit /b
+)
+echo    Venv olusturuldu.
+
 call venv\Scripts\activate
+if %errorlevel% neq 0 (
+    echo [HATA] Venv aktif edilemedi.
+    pause
+    exit /b
+)
 echo    Venv aktif edildi.
 
 :: 3. KUTUPHANELER VE GTK4
@@ -35,14 +53,7 @@ echo    Bu islem internet hizina gore biraz zaman alabilir...
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 pip install pyinstaller
-
-:: Windows icin ozel GTK destegi (PyGObject ve gvsbuild)
-echo    GTK4 icin PyGObject kuruluyor...
 pip install pygobject
-
-:: Eger GTK DLL'leri yoksa gvsbuild ile kurmayi deneriz (Opsiyonel ama saglam)
-:: Basit yontem: PyGObject Windows'ta cogu zaman calisir ama DLL eksikse hata verir.
-:: Biz burada standart paketlemeyi deneyecegiz. Eger calismazsa gvsbuild eklememiz gerekir.
 
 :: 4. FFMPEG OTOMATIK INDIRME
 echo.
@@ -50,16 +61,16 @@ echo [4/6] FFmpeg kontrol ediliyor ve indiriliyor...
 if not exist "ffmpeg.exe" (
     echo    FFmpeg indiriliyor (PowerShell)...
     powershell -Command "Invoke-WebRequest -Uri 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip' -OutFile 'ffmpeg.zip'"
-
+    
     echo    Zip'ten cikariliyor...
     powershell -Command "Expand-Archive -Path 'ffmpeg.zip' -DestinationPath 'ffmpeg_temp' -Force"
-
+    
     echo    Dosyalar yerlestiriliyor...
-    :: Zip yapisina gore exe'yi bulup tasi
+    REM Zip yapisina gore exe'yi bulup tasi
     for /r "ffmpeg_temp" %%f in (ffmpeg.exe) do move "%%f" . >nul
     for /r "ffmpeg_temp" %%f in (ffprobe.exe) do move "%%f" . >nul
-
-    :: Temizlik
+    
+    REM Temizlik
     del ffmpeg.zip
     rmdir /s /q ffmpeg_temp
     echo    FFmpeg hazir!
