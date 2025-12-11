@@ -1,30 +1,44 @@
 @echo off
 setlocal EnableDelayedExpansion
 color 0B
-title DownX - Windows Build Araci (FINAL FIX 6.0)
+title DownX - Windows Build Araci (FINAL FIX 7.0)
 
 cd /d "%~dp0"
 
 echo ========================================================
-echo   DownX - TAM OTOMATIK BUILD SISTEMI (FINAL FIX 6.0)
-echo   "Linux Script Enjeksiyonu + Path Fix"
+echo   DownX - TAM OTOMATIK BUILD SISTEMI (FINAL FIX 7.0)
+echo   "Akilli Konumlandirma ve Pip Modu"
 echo ========================================================
 echo.
 
 REM ----------------------------------------------------------
-REM 1. ADIM: TEMIZLIK
+REM 1. ADIM: PROJE KONTROLU
 REM ----------------------------------------------------------
-echo [1/8] Temizlik yapiliyor...
+echo [1/8] Dosyalar kontrol ediliyor...
+if not exist "requirements.txt" (
+    color 0C
+    echo [HATA] requirements.txt dosyasi bulunamadi!
+    echo Lutfen scripti proje klasorunun icinde calistirin.
+    pause
+    exit /b
+)
+echo    [OK] Dosyalar tamam.
+
+REM ----------------------------------------------------------
+REM 2. ADIM: TEMIZLIK
+REM ----------------------------------------------------------
+echo.
+echo [2/8] Temizlik yapiliyor...
 if exist "dist" rmdir /s /q "dist"
 if exist "build" rmdir /s /q "build"
 if exist "build_helper.sh" del "build_helper.sh"
 echo    [OK] Temizlik yapildi.
 
 REM ----------------------------------------------------------
-REM 2. ADIM: MSYS2 KONTROLU
+REM 3. ADIM: MSYS2 KONTROLU
 REM ----------------------------------------------------------
 echo.
-echo [2/8] MSYS2 sistemi kontrol ediliyor...
+echo [3/8] MSYS2 sistemi kontrol ediliyor...
 
 if exist "C:\msys64\usr\bin\bash.exe" (
     echo    [OK] MSYS2 bulundu.
@@ -46,10 +60,10 @@ if exist "C:\msys64\usr\bin\bash.exe" (
 )
 
 REM ----------------------------------------------------------
-REM 3. ADIM: SPEC DOSYASI
+REM 4. ADIM: SPEC DOSYASI
 REM ----------------------------------------------------------
 echo.
-echo [3/8] DownX.spec dosyasi hazirlaniyor...
+echo [4/8] DownX.spec dosyasi hazirlaniyor...
 
 (
 echo # -*- mode: python ; coding: utf-8 -*-
@@ -127,12 +141,10 @@ echo ^)
 echo    [OK] Spec dosyasi yenilendi.
 
 REM ----------------------------------------------------------
-REM 4. ADIM: CEKIRDEK GUNCELLEME VE RESET
+REM 5. ADIM: CEKIRDEK GUNCELLEME VE RESET
 REM ----------------------------------------------------------
 echo.
-echo [4/8] MSYS2 Cekirdegi Guncelleniyor...
-echo    Bu islemden sonra MSYS2 surecleri zorla kapatilacak.
-
+echo [5/8] MSYS2 Cekirdegi Guncelleniyor...
 C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed --disable-download-timeout msys2-runtime"
 
 echo.
@@ -144,24 +156,31 @@ taskkill /F /IM mintty.exe >nul 2>&1
 timeout /t 2 >nul
 
 REM ----------------------------------------------------------
-REM 5. ADIM: BUILD SCRIPTINI OLUSTURMA (GUVENLI MOD)
+REM 6. ADIM: BUILD SCRIPTINI OLUSTURMA (GUVENLI MOD)
 REM ----------------------------------------------------------
 echo.
-echo [5/8] Linux build scripti olusturuluyor...
+echo [6/8] Linux build scripti olusturuluyor...
 
 REM Ozel karakter sorunu olmasin diye gecici olarak kapatiyoruz
 setlocal DisableDelayedExpansion
 (
 echo #!/bin/bash
+echo set -e  # Hata olursa dur
 echo source /etc/profile
 echo export PATH="/mingw64/bin:$PATH"
 echo.
+echo echo "--- CALISMA DIZININE GIDILIYOR ---"
+echo cd "$(dirname "$0")"
+echo pwd
+echo.
 echo echo "--- PAKET KURULUMU BASLIYOR ---"
-echo pacman -Sy
+echo # PyInstaller listesinden cikarildi, pip ile kurulacak
+echo pacman -S --noconfirm --needed --disable-download-timeout mingw-w64-x86_64-python mingw-w64-x86_64-python-gobject mingw-w64-x86_64-gtk4 mingw-w64-x86_64-python-pip mingw-w64-x86_64-ffmpeg mingw-w64-x86_64-adwaita-icon-theme gcc pkg-config
 echo.
-echo pacman -S --noconfirm --needed --disable-download-timeout mingw-w64-x86_64-python mingw-w64-x86_64-python-gobject mingw-w64-x86_64-gtk4 mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-pyinstaller mingw-w64-x86_64-ffmpeg mingw-w64-x86_64-adwaita-icon-theme gcc pkg-config
-echo.
-echo echo "--- PYTHON PAKETLERI KURULUYOR ---"
+echo echo "--- PIP KURULUMLARI ---"
+echo # Break system packages zorunlu
+echo python -m pip install --upgrade pip --break-system-packages --no-cache-dir
+echo python -m pip install pyinstaller --break-system-packages --no-cache-dir
 echo python -m pip install -r requirements.txt --break-system-packages --no-cache-dir
 echo.
 echo echo "--- EXE DERLENIYOR ---"
@@ -179,23 +198,29 @@ if exist "build_helper.sh" (
 )
 
 REM ----------------------------------------------------------
-REM 6. ADIM: BUILD SCRIPTINI CALISTIRMA
+REM 7. ADIM: BUILD SCRIPTINI CALISTIRMA
 REM ----------------------------------------------------------
 echo.
-echo [6/8] Derleme islemi baslatiliyor...
+echo [7/8] Derleme islemi baslatiliyor...
 echo    MSYS2 uzerinde komutlar calistirilacak.
 
 REM Windows yolunu Linux formatina cevir (Ters slashlari duzelt)
 set "LINUX_PATH=%cd:\=/%"
+REM Sürücü harfinin önündeki : işaretini kaldır (C: -> C)
+set "LINUX_PATH=%LINUX_PATH::=%"
+REM Basina / koy (/C/Users/...)
+set "LINUX_PATH=/%LINUX_PATH%"
 
-REM Bash komutunu calistir (Dogru yola giderek)
+echo    Hedef Yol: %LINUX_PATH%
+
+REM Bash komutunu calistir
 C:\msys64\usr\bin\bash.exe -l -c "cd '%LINUX_PATH%'; chmod +x build_helper.sh; ./build_helper.sh"
 
 REM ----------------------------------------------------------
-REM 7. ADIM: SONUC KONTROLU
+REM 8. ADIM: SONUC KONTROLU
 REM ----------------------------------------------------------
 echo.
-echo [7/8] Sonuc kontrol ediliyor...
+echo [8/8] Sonuc kontrol ediliyor...
 
 if exist "dist\DownX\DownX.exe" (
     color 0A
