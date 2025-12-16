@@ -35,7 +35,7 @@ class SettingsTab(Adw.PreferencesPage):
 
         # Klasör Seçimi
         self.row_folder = Adw.ActionRow(title="İndirme Klasörü")
-        self.row_folder.set_subtitle(str(GLOBAL_CONFIG.get("download_path", "~/Downloads")))
+        self.row_folder.set_subtitle(str(GLOBAL_CONFIG.get("download_dir", "~/Music")))
         self.row_folder.set_icon_name("folder-download-symbolic")
 
         btn_folder = Gtk.Button(icon_name="folder-open-symbolic")
@@ -57,7 +57,7 @@ class SettingsTab(Adw.PreferencesPage):
         self.row_quality = Adw.ComboRow(title="Ses Kalitesi", model=quality_model)
         self.row_quality.set_icon_name("audio-volume-high-symbolic")
 
-        # Mevcut kaliteyi seç (Basit eşleştirme)
+        # Mevcut kaliteyi seç
         saved_q = GLOBAL_CONFIG.get("audio_quality", "192")
         for i, q in enumerate(["320", "256", "192", "128"]):
             if q in str(saved_q):
@@ -81,21 +81,19 @@ class SettingsTab(Adw.PreferencesPage):
         self.row_thumb.connect("notify::active", self.on_switch_changed, "embed_thumbnail")
         group_quality.add(self.row_thumb)
 
-        # --- 3. GRUP: Spotify API (YENİ EKLENDİ) ---
+        # --- 3. GRUP: Spotify API ---
         group_api = Adw.PreferencesGroup(title="Spotify Bağlantısı", description="Şarkı listelerini çekmek için gereklidir")
         self.add(group_api)
 
-        # Client ID (Normal Giriş) - ✅ OPTİMİZE EDİLDİ
+        # Client ID
         self.entry_client_id = Adw.EntryRow(title="Client ID")
         self.entry_client_id.set_text(GLOBAL_CONFIG.get("spotify_client_id", ""))
-        # Sadece Enter'a basınca kaydet (spam önlendi)
         self.entry_client_id.connect("apply", self.on_api_changed, "spotify_client_id")
         group_api.add(self.entry_client_id)
 
-        # Client Secret (Şifreli Giriş) - ✅ OPTİMİZE EDİLDİ
+        # Client Secret
         self.entry_secret = Adw.PasswordEntryRow(title="Client Secret")
         self.entry_secret.set_text(GLOBAL_CONFIG.get("spotify_client_secret", ""))
-        # Sadece Enter'a basınca kaydet (spam önlendi)
         self.entry_secret.connect("apply", self.on_api_changed, "spotify_client_secret")
         group_api.add(self.entry_secret)
 
@@ -111,6 +109,7 @@ class SettingsTab(Adw.PreferencesPage):
     # --- Olaylar (Logic) ---
 
     def on_mode_changed(self, row, param):
+        """İndirme modu değiştiğinde"""
         modes = ["audio", "video+audio", "video"]
         selected_mode = modes[row.get_selected()]
         GLOBAL_CONFIG["download_mode"] = selected_mode
@@ -118,6 +117,7 @@ class SettingsTab(Adw.PreferencesPage):
         print(f"[AYAR] Mod: {selected_mode}")
 
     def on_quality_changed(self, row, param):
+        """Ses kalitesi değiştiğinde"""
         qualities = ["320", "256", "192", "128"]
         selected_q = qualities[row.get_selected()]
         GLOBAL_CONFIG["audio_quality"] = selected_q
@@ -125,37 +125,52 @@ class SettingsTab(Adw.PreferencesPage):
         print(f"[AYAR] Kalite: {selected_q}kbps")
 
     def on_switch_changed(self, row, param, config_key):
+        """Switch (metadata/thumbnail) değiştiğinde"""
         value = row.get_active()
         GLOBAL_CONFIG[config_key] = value
         save_config()
         print(f"[AYAR] {config_key}: {value}")
 
     def on_api_changed(self, entry, config_key):
-        # EntryRow ve PasswordEntryRow'dan metni al
+        """Spotify API bilgileri değiştiğinde"""
         text = entry.get_text()
         GLOBAL_CONFIG[config_key] = text
         save_config()
         print(f"[AYAR] {config_key} güncellendi")
 
     def on_folder_clicked(self, btn):
+        """Klasör seçme butonu tıklandığında"""
         dialog = Gtk.FileDialog()
         dialog.select_folder(self.parent_window, None, self.on_folder_selected)
 
     def on_folder_selected(self, dialog, result):
+        """Klasör seçildiğinde"""
         try:
             folder = dialog.select_folder_finish(result)
             if folder:
-                path = folder.get_path().get_path()
+                path = folder.get_path()
                 self.row_folder.set_subtitle(path)
-                update_download_dir(path)
+                GLOBAL_CONFIG["download_dir"] = path
+                save_config()
                 print(f"[AYAR] Klasör: {path}")
-        except: pass
+        except Exception as e:
+            print(f"[AYAR HATA] Klasör seçilemedi: {e}")
 
     def on_reset_clicked(self, btn):
-        # Varsayılanları geri yükle
+        """Ayarları sıfırla butonu"""
         from settings import DEFAULT_CONFIG
-        save_config(DEFAULT_CONFIG)
-        # UI'ı güncellemek için yeniden başlatmak gerekebilir veya
-        # buraya set_text/set_selected kodları eklenebilir.
-        # Basitlik için kullanıcıyı uyarmak yeterli.
-        print("Ayarlar sıfırlandı. Uygulamayı yeniden başlatın.")
+        
+        # Varsayılan değerleri GLOBAL_CONFIG'e kopyala
+        for key, value in DEFAULT_CONFIG.items():
+            GLOBAL_CONFIG[key] = value
+        
+        save_config()
+        print("[AYAR] Varsayılanlara sıfırlandı. Uygulamayı yeniden başlatın.")
+        
+        # Toast bildirimi göster
+        toast = Adw.Toast(title="Ayarlar sıfırlandı. Uygulamayı yeniden başlatın.")
+        toast.set_timeout(3)
+        
+        # Parent window'dan toast overlay'i bul ve toast'ı göster
+        if hasattr(self.parent_window, 'toast_overlay'):
+            self.parent_window.toast_overlay.add_toast(toast)
