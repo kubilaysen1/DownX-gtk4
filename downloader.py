@@ -70,7 +70,7 @@ class Downloader(threading.Thread):
         download_mode = GLOBAL_CONFIG.get("download_mode", "audio")
         
         # SES AYARLARI
-        audio_format = GLOBAL_CONFIG.get("audio_format", "mp3").lower()
+        audio_format = (GLOBAL_CONFIG.get("audio_format") or "mp3").lower()
         
         audio_quality = GLOBAL_CONFIG.get("audio_quality", "192")
         # Sadece sayı varsa 'k' ekle
@@ -84,7 +84,7 @@ class Downloader(threading.Thread):
         audio_channels = GLOBAL_CONFIG.get("audio_channels", "2")
         
         # VIDEO AYARLARI
-        video_format = GLOBAL_CONFIG.get("video_format", "mp4").lower()
+        video_format = (GLOBAL_CONFIG.get("video_format") or "mp4").lower()
         video_codec = GLOBAL_CONFIG.get("video_codec", "h264")
         video_quality = GLOBAL_CONFIG.get("video_quality", "1080p")
         video_bitrate = GLOBAL_CONFIG.get("video_bitrate", "auto")
